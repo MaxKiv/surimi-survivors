@@ -4,11 +4,12 @@ use macroquad::prelude::*;
 async fn main() {
     let mut x = screen_width() / 2.0;
     let mut y = screen_height() / 2.0;
+    let mut game_running = true;
 
     let rustacean_tex = load_texture("assets/rustacean_happy.png").await.unwrap();
     rustacean_tex.set_filter(FilterMode::Nearest);
 
-    loop {
+    while game_running {
         clear_background(LIGHTGRAY);
 
         if is_key_down(KeyCode::D) {
@@ -22,6 +23,9 @@ async fn main() {
         }
         if is_key_down(KeyCode::W) {
             y -= 1.0;
+        }
+        if is_key_down(KeyCode::Escape) {
+            game_running = false;
         }
 
         draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
