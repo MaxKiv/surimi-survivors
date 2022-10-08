@@ -44,7 +44,7 @@ async fn main() {
 
     let mut world = World::new();
 
-    let player = CrabPlayer {
+    let mut player = CrabPlayer {
         collider: world.add_actor(vec2(50.0, 80.0), 8, 8),
         speed: vec2(0., 0.),
         health: 100.0,
@@ -56,7 +56,7 @@ async fn main() {
     };
 
     while alive && game_running {
-        clear_background(LIGHTGRAY);
+        clear_background(MAGENTA);
 
         {
             let pos = world.solid_pos(wall.collider);
@@ -82,6 +82,12 @@ async fn main() {
         }
         if is_key_down(KeyCode::Escape) {
             game_running = false;
+        }
+
+        let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
+
+        if(collided_with_definitely_wall){
+            player.health -= 1.0;
         }
 
         draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
