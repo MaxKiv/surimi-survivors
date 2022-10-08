@@ -25,10 +25,9 @@ async fn main() {
         }
 
         draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
+
         draw_texture(rustacean_tex, x, y, YELLOW);
 
-        // draw_circle(x, y, 15.0, YELLOW);
-        draw_text("move the ball with arrow keys", 20.0, 20.0, 20.0, DARKGRAY);
         next_frame().await
     }
 }
