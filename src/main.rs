@@ -1,14 +1,14 @@
 use macroquad::prelude::*;
 use macroquad::prelude::animation::AnimatedSprite;
 use macroquad::prelude::collections::storage;
-use macroquad_platformer::Actor;
+use macroquad_platformer::{Actor, Solid, World};
 
 struct Resources {
     crab_sprite: Texture2D,
 }
 
 impl Resources {
-    async fn new() -> Result<Resources, macroquad::prelude::FileError> {
+    async fn new() -> Result<Resources, FileError> {
         let crab_sprite = load_texture("assets/rustacean_happy.png").await?;
 
         Ok(Resources{
@@ -17,22 +17,15 @@ impl Resources {
     }
 }
 
-// struct CrabPlayer {
-//     collider: Actor,
-//     speed: Vec2,
-// }
-//
-// impl CrabPlayer {
-//     pub const MOVE_SPEED: f32 = 300.0;
-//
-//     fn new() -> CrabPlayer {
-//         let mut resources = storage::get_mut::<Resources>().unwrap();
-//
-//         CrabPlayer {
-//             collider: resources.physics.add
-//         }
-//     }
-// }
+struct CrabPlayer {
+    collider: Actor,
+    speed: Vec2,
+}
+
+struct Wall {
+    collider: Solid,
+    speed: f32
+}
 
 #[macroquad::main("InputKeys")]
 async fn main() {
@@ -41,7 +34,18 @@ async fn main() {
     let mut game_running = true;
 
     let resources = Resources::new().await.unwrap();
-    // storage::store(resources);
+
+    let mut world = World::new();
+
+    let mut player = CrabPlayer {
+        collider: world.add_actor(vec2(50.0, 80.0), 8, 8),
+        speed: vec2(0., 0.),
+    };
+
+    let mut wall = Wall{
+        collider: world.add_solid(vec2(170.0, 130.0), 32, 8),
+        speed: 50.,
+    };
 
     while game_running {
         clear_background(LIGHTGRAY);
