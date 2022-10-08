@@ -1,6 +1,5 @@
+use std::time::{Duration, Instant};
 use macroquad::prelude::*;
-use macroquad::prelude::animation::AnimatedSprite;
-use macroquad::prelude::collections::storage;
 use macroquad_platformer::{Actor, Solid, World};
 
 pub const PLAYER_SPEED: f32 = 5.0;
@@ -21,99 +20,83 @@ impl Resources {
     }
 }
 
-struct CrabPlayer {
+struct Enemy {
     collider: Actor,
     speed: Vec2,
     health: f32,
+    damage: f32,
 }
 
-#[derive(Clone)]
-struct Player {
+struct CrabPlayer {
+    collider: Actor,
     pos: Vec2,
     speed: Vec2,
     health: f32,
 }
 
-#[derive(Clone)]
 struct Wall {
     collider: Solid,
-    speed: f32
 }
 
-#[derive(Clone)]
-struct Projectile {
-    pos: Vec2,
-    velocity: Vec2,
-}
-
-#[derive(Clone)]
 struct GameState {
-    player: Player,
-    projectiles: Vec<Projectile>,
-    enemies: Vec<Wall>,
+    alive: bool,
+    player: CrabPlayer,
+    max_enemies: i32,
+    enemies: Vec<Enemy>,
+    playtime: Duration,
 }
 
 #[macroquad::main("InputKeys")]
 async fn main() {
+    let mut world = World::new();
+
+    let mut gamestate = GameState {
+        alive: true,
+        player: CrabPlayer {
+            collider: world.add_actor(vec2(0., 0.), PLAYER_SIZE.x.round() as i32, PLAYER_SIZE.y.round() as i32),
+            pos: vec2(0., 0.),
+            speed: vec2(PLAYER_SPEED, PLAYER_SPEED),
+            health: 100.0,
+        },
+        max_enemies: 100,
+        enemies: Vec::new(),
+        playtime: Duration::new(0, 0),
+    };
+
     let x = screen_width() / 2.0;
     let y = screen_height() / 2.0;
     let width = 800.0;
     let height = width * (y / x);
-    let mut game_running = true;
-    let mut alive = true;
 
     let resources = Resources::new().await.unwrap();
-    let mut world = World::new();
-    let mut gamestate = GameState{
-        player: Player{
-            pos: vec2(50.0, 80.0),
-            speed: vec2(0., 0.),
-            health: 100.0,
-        },
-        projectiles: Vec::new(),
-        enemies: Vec::new(),
-    };
 
-    gamestate.projectiles.push(Projectile{
-        pos: vec2(0., 0.),
-        velocity: vec2(1., 1.),
-    });
+    // let wall = Wall{
+    //     collider: world.add_solid(vec2(400.0, 130.0), 32, 8),
+    // };
 
-    let mut player = CrabPlayer {
-        collider: world.add_actor(vec2(50.0, 80.0), 8, 8),
-        speed: vec2(0., 0.),
-        health: 100.0,
-    };
-
-    let wall = Wall{
-        collider: world.add_solid(vec2(400.0, 130.0), 32, 8),
-        speed: 50.,
-    };
-
-    while alive && game_running {
+    while gamestate.alive {
         clear_background(WHITE);
 
-        // Draw "wall"
-        {
-            let pos = world.solid_pos(wall.collider);
-            draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
-        }
+        draw_fps();
+        draw_time(&gamestate);
 
-        draw_projectiles(&gamestate, &resources);
+        // // Draw "wall"
+        // {
+        //     let pos = world.solid_pos(wall.collider);
+        //     draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
+        // }
+        // draw_projectiles(&gamestate, &resources);
 
-        draw_new_player(&gamestate, &resources);
 
 
-        let mut player_pos = world.actor_pos(player.collider);
-        process_inputs(&mut world, &mut player, &mut player_pos, &mut game_running);
+        let player_pos = world.actor_pos(gamestate.player.collider);
+        process_inputs(&mut world, &mut gamestate);
 
-        let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
+        // let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
 
-        if collided_with_definitely_wall {
-            player.health -= 1.0;
-        }
-
-        draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
+        // if collided_with_definitely_wall {
+        //     player.health -= 1.0;
+        // }
 
         let camera = Camera2D::from_display_rect(Rect::new(
             player_pos.x - (width / 2.0),
@@ -123,11 +106,12 @@ async fn main() {
         );
         set_camera(&camera);
 
-        //draw_player(&player, &player_pos, &resources);
+        // draw_enemies(&world, &resources);
+        // draw single enemy
 
-        if player.health <= 0.0 {
-            alive = false;
-        }
+        draw_player(&mut gamestate, &resources);
+
+        update_health(&mut gamestate);
 
         next_frame().await
     }
@@ -136,52 +120,118 @@ async fn main() {
 
 }
 
-fn draw_new_player(gs: &GameState, rs: &Resources) {
-    draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, YELLOW);
-    draw_rectangle_lines(gs.player.pos.x, gs.player.pos.y, PLAYER_SIZE.x, PLAYER_SIZE.y, 5.0, BLACK);
+fn draw_fps() -> () {
+    draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
 }
 
-fn draw_projectiles(gs: &GameState, rs: &Resources) {
-    for p in gs.projectiles {
-        draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, RED);
+fn draw_time(gamestate: &GameState) -> () {
+    let seconds = gamestate.playtime.as_secs() % 60;
+    let minutes = (gamestate.playtime.as_secs() / 60) % 60;
+    let hours = (gamestate.playtime.as_secs() / 60) / 60;
+    let time_string = format!("{}:{}:{}", hours, minutes, seconds);
+    draw_text(&time_string, 0., 0., 20.0, DARKGRAY);
+}
+
+fn update_health(gamestate: &mut GameState) -> () {
+    if gamestate.player.health <= 0.0 {
+        gamestate.alive = false;
     }
 }
 
-fn process_inputs(world: &mut World, player: &mut CrabPlayer, player_pos: &mut Vec2, game_running: &mut bool) {
+// fn draw_enemies(enemies: &mut [Enemy], resources: &Resources) {
+    // for enemy in &enemies {
+    //     draw_enemy(&enemy, &resources);
+    // }
+// }
+
+//
+// fn draw_projectiles(gs: &GameState, rs: &Resources) {
+//     for p in gs.projectiles {
+//         draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, RED);
+//     }
+// }
+
+fn process_inputs(world: &mut World, gamestate: &mut GameState){
     if is_key_down(KeyCode::D) {
-        player_pos.x += PLAYER_SPEED;
-        world.set_actor_position(player.collider, *player_pos);
+        gamestate.player.pos.x += PLAYER_SPEED;
+        world.set_actor_position(gamestate.player.collider, gamestate.player.pos);
     }
     if is_key_down(KeyCode::A) {
-        player_pos.x -= PLAYER_SPEED; 
-        world.set_actor_position(player.collider, *player_pos);
+        gamestate.player.pos.x -= PLAYER_SPEED;
+        world.set_actor_position(gamestate.player.collider, gamestate.player.pos);
     }
     if is_key_down(KeyCode::S) {
-        player_pos.y += PLAYER_SPEED;
-        world.set_actor_position(player.collider, *player_pos);
+        gamestate.player.pos.y += PLAYER_SPEED;
+        world.set_actor_position(gamestate.player.collider, gamestate.player.pos);
     }
     if is_key_down(KeyCode::W) {
-        player_pos.y -= PLAYER_SPEED;
-        world.set_actor_position(player.collider, *player_pos);
+        gamestate.player.pos.y -= PLAYER_SPEED;
+        world.set_actor_position(gamestate.player.collider, gamestate.player.pos);
     }
     if is_key_down(KeyCode::Escape) {
-        *game_running = false;
+        gamestate.alive = false;
     }
 }
 
-fn draw_player(player: &CrabPlayer, pos: &Vec2, resources: &Resources) {
-    draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
-    draw_rectangle_lines(pos.x, pos.y, PLAYER_SIZE.x, PLAYER_SIZE.y, 5.0, BLACK);
-    draw_healthbar(&player, &pos);
+fn draw_player(gamestate: &mut GameState, resources: &Resources) {
+    draw_texture(resources.crab_sprite, gamestate.player.pos.x, gamestate.player.pos.y, YELLOW);
+    // draw collision box
+    draw_collision_box(gamestate);
+    draw_healthbar(gamestate);
 }
 
-fn draw_healthbar(player: &CrabPlayer, pos: &Vec2) {
-    let health_scaling_factor = player.health / 100.0;
-    let offset = vec2(PLAYER_SIZE.x / 2.0 - HEALTHBAR_SIZE.x / 2.0, PLAYER_SIZE.y + HEALTHBAR_SIZE.y / 2.0);
-    draw_rectangle(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, RED);
-    draw_rectangle_lines(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, 5.0, BLACK);
+fn draw_collision_box(gamestate: &mut GameState) -> () {
+    draw_rectangle_lines(
+        gamestate.player.pos.x,
+        gamestate.player.pos.y,
+        PLAYER_SIZE.x,
+        PLAYER_SIZE.y,
+        5.0,
+        GRAY
+    );
 }
 
-fn does_projectile_hit(projectile: &Projectile, target: &CrabPlayer){
-
+fn draw_healthbar(gamestate: &mut GameState) {
+    let health_scaling_factor = gamestate.player.health / 100.0;
+    let offset = vec2(
+        PLAYER_SIZE.x / 2.0 - HEALTHBAR_SIZE.x / 2.0,
+        PLAYER_SIZE.y + HEALTHBAR_SIZE.y / 2.0
+    );
+    draw_rectangle(
+        gamestate.player.pos.x + offset.x,
+        gamestate.player.pos.y + offset.y,
+        health_scaling_factor * HEALTHBAR_SIZE.x,
+        HEALTHBAR_SIZE.y,
+        RED
+    );
+    draw_rectangle_lines(
+        gamestate.player.pos.x + offset.x,
+        gamestate.player.pos.y + offset.y,
+        health_scaling_factor * HEALTHBAR_SIZE.x,
+        HEALTHBAR_SIZE.y,
+        5.0,
+        BLACK
+    );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// fn spawn_location_factory(()) -> Vec2 {
+// }
+
+// fn does_projectile_hit(projectile: &Projectile, target: &CrabPlayer){
+//
+// }
