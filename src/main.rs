@@ -99,8 +99,10 @@ async fn main() {
         // }
 
         let camera = Camera2D::from_display_rect(Rect::new(
-            player_pos.x - (width / 2.0),
-            player_pos.y - (height / 2.0),
+            // player_pos.x - (width / 2.0),
+            // player_pos.y - (height / 2.0),
+            gamestate.player.pos.x - (width / 2.0),
+            gamestate.player.pos.y - (height / 2.0),
             width,
             height)
         );
