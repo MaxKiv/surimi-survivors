@@ -102,6 +102,10 @@ async fn main() {
 
         draw_player(&player, &player_pos, &resources);
 
+        if(player.health <= 0.0) {
+            alive = false;
+        }
+
         next_frame().await
     }
 
