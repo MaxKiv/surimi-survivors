@@ -1,4 +1,38 @@
 use macroquad::prelude::*;
+use macroquad::prelude::animation::AnimatedSprite;
+use macroquad::prelude::collections::storage;
+use macroquad_platformer::Actor;
+
+struct Resources {
+    crab_sprite: Texture2D,
+}
+
+impl Resources {
+    async fn new() -> Result<Resources, macroquad::prelude::FileError> {
+        let crab_sprite = load_texture("assets/rustacean_happy.png").await?;
+
+        Ok(Resources{
+            crab_sprite
+        })
+    }
+}
+
+// struct CrabPlayer {
+//     collider: Actor,
+//     speed: Vec2,
+// }
+//
+// impl CrabPlayer {
+//     pub const MOVE_SPEED: f32 = 300.0;
+//
+//     fn new() -> CrabPlayer {
+//         let mut resources = storage::get_mut::<Resources>().unwrap();
+//
+//         CrabPlayer {
+//             collider: resources.physics.add
+//         }
+//     }
+// }
 
 #[macroquad::main("InputKeys")]
 async fn main() {
@@ -6,8 +40,8 @@ async fn main() {
     let mut y = screen_height() / 2.0;
     let mut game_running = true;
 
-    let rustacean_tex = load_texture("assets/rustacean_happy.png").await.unwrap();
-    rustacean_tex.set_filter(FilterMode::Nearest);
+    let resources = Resources::new().await.unwrap();
+    // storage::store(resources);
 
     while game_running {
         clear_background(LIGHTGRAY);
@@ -30,7 +64,7 @@ async fn main() {
 
         draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
 
-        draw_texture(rustacean_tex, x, y, YELLOW);
+        draw_texture(resources.crab_sprite, x, y, YELLOW);
 
         next_frame().await
     }
