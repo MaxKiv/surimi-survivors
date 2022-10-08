@@ -85,6 +85,9 @@ async fn main() {
         //     let pos = world.solid_pos(wall.collider);
         //     draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
         // }
+        // draw_projectiles(&gamestate, &resources);
+
+
 
         let player_pos = world.actor_pos(gamestate.player.collider);
         process_inputs(&mut world, &mut gamestate);
@@ -141,13 +144,20 @@ fn update_health(gamestate: &mut GameState) -> () {
     // }
 // }
 
-fn process_inputs(world: &mut World, gamestate: &mut GameState) {
+//
+// fn draw_projectiles(gs: &GameState, rs: &Resources) {
+//     for p in gs.projectiles {
+//         draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, RED);
+//     }
+// }
+
+fn process_inputs(world: &mut World, gamestate: &mut GameState){
     if is_key_down(KeyCode::D) {
         gamestate.player.pos.x += PLAYER_SPEED;
         world.set_actor_position(gamestate.player.collider, gamestate.player.pos);
     }
     if is_key_down(KeyCode::A) {
-        gamestate.player.pos.x -= PLAYER_SPEED; 
+        gamestate.player.pos.x -= PLAYER_SPEED;
         world.set_actor_position(gamestate.player.collider, gamestate.player.pos);
     }
     if is_key_down(KeyCode::S) {
@@ -204,5 +214,24 @@ fn draw_healthbar(gamestate: &mut GameState) {
     );
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // fn spawn_location_factory(()) -> Vec2 {
+// }
+
+// fn does_projectile_hit(projectile: &Projectile, target: &CrabPlayer){
+//
 // }
