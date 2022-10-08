@@ -8,16 +8,16 @@ async fn main() {
     loop {
         clear_background(LIGHTGRAY);
 
-        if is_key_down(KeyCode::Right) {
+        if is_key_down(KeyCode::D) {
             x += 1.0;
         }
-        if is_key_down(KeyCode::Left) {
+        if is_key_down(KeyCode::A) {
             x -= 1.0;
         }
-        if is_key_down(KeyCode::Down) {
+        if is_key_down(KeyCode::S) {
             y += 1.0;
         }
-        if is_key_down(KeyCode::Up) {
+        if is_key_down(KeyCode::W) {
             y -= 1.0;
         }
 
