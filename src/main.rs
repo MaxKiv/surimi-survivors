@@ -27,9 +27,30 @@ struct CrabPlayer {
     health: f32,
 }
 
+#[derive(Clone)]
+struct Player {
+    pos: Vec2,
+    speed: Vec2,
+    health: f32,
+}
+
+#[derive(Clone)]
 struct Wall {
     collider: Solid,
     speed: f32
+}
+
+#[derive(Clone)]
+struct Projectile {
+    pos: Vec2,
+    velocity: Vec2,
+}
+
+#[derive(Clone)]
+struct GameState {
+    player: Player,
+    projectiles: Vec<Projectile>,
+    enemies: Vec<Wall>,
 }
 
 #[macroquad::main("InputKeys")]
@@ -42,8 +63,21 @@ async fn main() {
     let mut alive = true;
 
     let resources = Resources::new().await.unwrap();
-
     let mut world = World::new();
+    let mut gamestate = GameState{
+        player: Player{
+            pos: vec2(50.0, 80.0),
+            speed: vec2(0., 0.),
+            health: 100.0,
+        },
+        projectiles: Vec::new(),
+        enemies: Vec::new(),
+    };
+
+    gamestate.projectiles.push(Projectile{
+        pos: vec2(0., 0.),
+        velocity: vec2(1., 1.),
+    });
 
     let mut player = CrabPlayer {
         collider: world.add_actor(vec2(50.0, 80.0), 8, 8),
@@ -65,6 +99,11 @@ async fn main() {
             draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
         }
 
+        draw_projectiles(&gamestate, &resources);
+
+        draw_new_player(&gamestate, &resources);
+
+
         let mut player_pos = world.actor_pos(player.collider);
         process_inputs(&mut world, &mut player, &mut player_pos, &mut game_running);
 
@@ -84,7 +123,7 @@ async fn main() {
         );
         set_camera(&camera);
 
-        draw_player(&player, &player_pos, &resources);
+        //draw_player(&player, &player_pos, &resources);
 
         if player.health <= 0.0 {
             alive = false;
@@ -95,6 +134,17 @@ async fn main() {
 
     // scoreboard and close game
 
+}
+
+fn draw_new_player(gs: &GameState, rs: &Resources) {
+    draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, YELLOW);
+    draw_rectangle_lines(gs.player.pos.x, gs.player.pos.y, PLAYER_SIZE.x, PLAYER_SIZE.y, 5.0, BLACK);
+}
+
+fn draw_projectiles(gs: &GameState, rs: &Resources) {
+    for p in gs.projectiles {
+        draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, RED);
+    }
 }
 
 fn process_inputs(world: &mut World, player: &mut CrabPlayer, player_pos: &mut Vec2, game_running: &mut bool) {
@@ -130,4 +180,8 @@ fn draw_healthbar(player: &CrabPlayer, pos: &Vec2) {
     let offset = vec2(PLAYER_SIZE.x / 2.0 - HEALTHBAR_SIZE.x / 2.0, PLAYER_SIZE.y + HEALTHBAR_SIZE.y / 2.0);
     draw_rectangle(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, RED);
     draw_rectangle_lines(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, 5.0, BLACK);
+}
+
+fn does_projectile_hit(projectile: &Projectile, target: &CrabPlayer){
+
 }
