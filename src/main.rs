@@ -3,6 +3,7 @@ use macroquad::prelude::animation::AnimatedSprite;
 use macroquad::prelude::collections::storage;
 use macroquad_platformer::{Actor, Solid, World};
 
+pub const PLAYER_SPEED: f32 = 5.0;
 pub const PLAYER_SIZE: Vec2 = vec2(32.0, 32.0);
 pub const HEALTHBAR_SIZE: Vec2 = vec2(50.0, 10.0);
 
@@ -56,37 +57,20 @@ async fn main() {
     };
 
     while alive && game_running {
-        clear_background(MAGENTA);
+        clear_background(WHITE);
 
+        // Draw "wall"
         {
             let pos = world.solid_pos(wall.collider);
             draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
         }
 
         let mut player_pos = world.actor_pos(player.collider);
-        if is_key_down(KeyCode::D) {
-            player_pos.x += 1.0;
-            world.set_actor_position(player.collider, player_pos);
-        }
-        if is_key_down(KeyCode::A) {
-            player_pos.x -= 1.0;
-            world.set_actor_position(player.collider, player_pos);
-        }
-        if is_key_down(KeyCode::S) {
-            player_pos.y += 1.0;
-            world.set_actor_position(player.collider, player_pos);
-        }
-        if is_key_down(KeyCode::W) {
-            player_pos.y -= 1.0;
-            world.set_actor_position(player.collider, player_pos);
-        }
-        if is_key_down(KeyCode::Escape) {
-            game_running = false;
-        }
+        process_inputs(&mut world, &mut player, &mut player_pos, &mut game_running);
 
         let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
 
-        if(collided_with_definitely_wall){
+        if collided_with_definitely_wall {
             player.health -= 1.0;
         }
 
@@ -102,7 +86,7 @@ async fn main() {
 
         draw_player(&player, &player_pos, &resources);
 
-        if(player.health <= 0.0) {
+        if player.health <= 0.0 {
             alive = false;
         }
 
@@ -113,6 +97,28 @@ async fn main() {
 
 }
 
+fn process_inputs(world: &mut World, player: &mut CrabPlayer, player_pos: &mut Vec2, game_running: &mut bool) {
+    if is_key_down(KeyCode::D) {
+        player_pos.x += PLAYER_SPEED;
+        world.set_actor_position(player.collider, *player_pos);
+    }
+    if is_key_down(KeyCode::A) {
+        player_pos.x -= PLAYER_SPEED; 
+        world.set_actor_position(player.collider, *player_pos);
+    }
+    if is_key_down(KeyCode::S) {
+        player_pos.y += PLAYER_SPEED;
+        world.set_actor_position(player.collider, *player_pos);
+    }
+    if is_key_down(KeyCode::W) {
+        player_pos.y -= PLAYER_SPEED;
+        world.set_actor_position(player.collider, *player_pos);
+    }
+    if is_key_down(KeyCode::Escape) {
+        *game_running = false;
+    }
+}
+
 fn draw_player(player: &CrabPlayer, pos: &Vec2, resources: &Resources) {
     draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
     draw_rectangle_lines(pos.x, pos.y, PLAYER_SIZE.x, PLAYER_SIZE.y, 5.0, BLACK);
@@ -121,8 +127,7 @@ fn draw_player(player: &CrabPlayer, pos: &Vec2, resources: &Resources) {
 
 fn draw_healthbar(player: &CrabPlayer, pos: &Vec2) {
     let health_scaling_factor = player.health / 100.0;
-    // let offset = vec2(-PLAYER_SIZE.x-HEALTHBAR_SIZE.x/2.0, PLAYER_SIZE.y);
     let offset = vec2(PLAYER_SIZE.x / 2.0 - HEALTHBAR_SIZE.x / 2.0, PLAYER_SIZE.y + HEALTHBAR_SIZE.y / 2.0);
-    draw_rectangle_lines(pos.x + offset.x + 2.0, pos.y + offset.y + 2.0, HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, 5.0, BLACK);
-    draw_rectangle(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, health_scaling_factor * HEALTHBAR_SIZE.y, RED);
+    draw_rectangle(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, RED);
+    draw_rectangle_lines(pos.x + offset.x, pos.y + offset.y, health_scaling_factor * HEALTHBAR_SIZE.x, HEALTHBAR_SIZE.y, 5.0, BLACK);
 }
