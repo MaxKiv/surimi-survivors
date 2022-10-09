@@ -7,7 +7,7 @@ pub const PLAYER_SPEED: f32 = 5.0;
 pub const PLAYER_STARTING_POSITION: Vec2 = vec2(0., 0.);
 pub const PLAYER_SIZE: Vec2 = vec2(32.0, 32.0);
 pub const HEALTHBAR_SIZE: Vec2 = vec2(50.0, 10.0);
-pub const ENEMY_HEALTHBAR_ENABLED: bool = false;
+pub const ENEMY_HEALTHBAR_ENABLED: bool = true;
 
 struct Resources {
     crab_sprite: Texture2D,
@@ -104,7 +104,7 @@ async fn main() {
     //     speed: vec2(1.5, 0.75),
     // });
 
-    for i in 1..100 {
+    for i in 1..1000 {
         gs.enemies.push(Enemy{
             pos: vec2(48.0 * ((i % 10) as f32), 128.0 + ((i / 10) as f32) * 48.0),
             size: vec2(32.0, 32.0),
@@ -137,7 +137,9 @@ async fn main() {
         };
 
         //collide_check_player(&gs.player, &mut gs.enemies, handle_enemy_hit);
-        collide_check_projectile(&gs.projectiles.first().unwrap(), &mut gs.enemies, handle_enemy_hit);
+        for projectile in gs.projectiles.iter() {
+            collide_check_projectile(projectile, &mut gs.enemies, handle_enemy_hit);
+        }
 
         let camera = Camera2D::from_display_rect(Rect::new(
             gs.player.pos.x - (width / 2.0),
@@ -245,7 +247,7 @@ fn process_inputs(gs: &mut GameState){
         gs.projectiles.push(Projectile{
             pos: gs.player.pos,
             size: vec2(32.0, 32.0),
-            speed: vec2(1.5, 0.),
+            speed: vec2(10., 0.),
         })
     }
 }
