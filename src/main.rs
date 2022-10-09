@@ -7,6 +7,7 @@ pub const PLAYER_SPEED: f32 = 5.0;
 pub const PLAYER_STARTING_POSITION: Vec2 = vec2(0., 0.);
 pub const PLAYER_SIZE: Vec2 = vec2(32.0, 32.0);
 pub const HEALTHBAR_SIZE: Vec2 = vec2(50.0, 10.0);
+pub const ENEMY_HEALTHBAR_ENABLED: bool = false;
 
 struct Resources {
     crab_sprite: Texture2D,
@@ -34,6 +35,7 @@ struct Enemy {
     speed: Vec2,
     health: f32,
     damage: f32,
+    alive: bool,
 }
 
 struct Player {
@@ -57,6 +59,8 @@ struct Projectile {
 
 struct GameState {
     start_time: Instant,
+    weapon_cooldown: f32,
+    weapon_last_fired: f32,
     alive: bool,
     player: Player,
     max_enemies: i32,
@@ -79,6 +83,8 @@ fn conf() -> Conf {
 async fn main() {
     let mut gs = GameState {
         start_time: Instant::now(),
+        weapon_cooldown: 1.0,
+        weapon_last_fired: 0.0,
         alive: true,
         player: Player {
             pos: PLAYER_STARTING_POSITION,
@@ -92,19 +98,24 @@ async fn main() {
         projectiles: vec![],
     };
 
-    gs.projectiles.push(Projectile{
-        pos: vec2(64.0, 64.0),
-        size: vec2(32.0, 32.0),
-        speed: vec2(1.0, 0.0),
-    });
+    // gs.projectiles.push(Projectile{
+    //     pos: vec2(64.0, 64.0),
+    //     size: vec2(32.0, 32.0),
+    //     speed: vec2(1.5, 0.75),
+    // });
 
-    gs.enemies.push(Enemy{
-        pos: vec2(128.0, 128.0),
-        size: vec2(32.0, 32.0),
-        speed: vec2(1.0, 0.0),
-        health: 100.0,
-        damage: 0.0
-    });
+    for i in 1..100 {
+        gs.enemies.push(Enemy{
+            pos: vec2(48.0 * ((i % 10) as f32), 128.0 + ((i / 10) as f32) * 48.0),
+            size: vec2(32.0, 32.0),
+            speed: vec2(1.0, 0.0),
+            health: 100.0,
+            damage: 0.0,
+            alive: true,
+        });
+    }
+
+
 
     let x = screen_width() / 2.0;
     let y = screen_height() / 2.0;
@@ -120,14 +131,13 @@ async fn main() {
         draw_time(&gs.start_time);
 
         process_inputs(&mut gs);
-        process_inputs(&mut gs);
 
-        let handle_enemy_hit = |enemy: &Enemy| {
-            println!("Enemy got HITITITITITITITITIT")
+        let handle_enemy_hit = |enemy: &mut Enemy| {
+            enemy.alive = false;
         };
 
-        collide_check_player(&gs.player, &gs.enemies, handle_enemy_hit);
-        //collide_check_projectile(&gs.projectiles.first().unwrap(), &gs.enemies, handle_enemy_hit);
+        //collide_check_player(&gs.player, &mut gs.enemies, handle_enemy_hit);
+        collide_check_projectile(&gs.projectiles.first().unwrap(), &mut gs.enemies, handle_enemy_hit);
 
         let camera = Camera2D::from_display_rect(Rect::new(
             gs.player.pos.x - (width / 2.0),
@@ -142,12 +152,19 @@ async fn main() {
         draw_player(&mut gs, &resources);
 
         update_health(&mut gs);
+        update_projectiles(&mut gs.projectiles);
 
         next_frame().await
     }
 }
 
-fn collide_check_player(player: &Player, enemies: &Vec<Enemy>, callback: fn(enemy: &Enemy)) {
+fn update_projectiles(ps: &mut Vec<Projectile>) {
+    for projectile in ps {
+        projectile.pos += projectile.speed
+    }
+}
+
+fn collide_check_player(player: &Player, enemies: &mut Vec<Enemy>, callback: fn(&mut Enemy)) {
     for enemy in enemies{
         if collide_check(player.pos, player.size, enemy.pos, enemy.size) {
             callback(enemy)
@@ -155,7 +172,7 @@ fn collide_check_player(player: &Player, enemies: &Vec<Enemy>, callback: fn(enem
     }
 }
 
-fn collide_check_projectile(projectile: &Projectile, enemies: &Vec<Enemy>, callback: fn(enemy: &Enemy)) {
+fn collide_check_projectile(projectile: &Projectile, enemies: &mut Vec<Enemy>, callback: fn(&mut Enemy)) {
     for enemy in enemies{
         if collide_check(projectile.pos, projectile.size, enemy.pos, enemy.size) {
             callback(enemy)
@@ -224,18 +241,28 @@ fn process_inputs(gs: &mut GameState){
     if is_key_down(KeyCode::Escape) {
         gs.alive = false;
     }
+    if is_key_down(KeyCode::Space)  {
+        gs.projectiles.push(Projectile{
+            pos: gs.player.pos,
+            size: vec2(32.0, 32.0),
+            speed: vec2(1.5, 0.),
+        })
+    }
 }
 
 fn draw_player(gs: &mut GameState, resources: &Resources) {
     draw_texture(resources.crab_sprite, gs.player.pos.x, gs.player.pos.y, YELLOW);
     // draw collision box
     draw_collision_box(gs);
-    draw_healthbar(gs);
+    draw_healthbar_player(gs);
 }
 
 fn draw_enemies(gs: &GameState, rs: &Resources) {
     for enemy in gs.enemies.iter() {
-        draw_texture(rs.enemy_sprite, enemy.pos.x, enemy.pos.y, WHITE);
+        if enemy.alive {
+            draw_texture(rs.enemy_sprite, enemy.pos.x, enemy.pos.y, WHITE);
+            if ENEMY_HEALTHBAR_ENABLED { draw_healthbar_enemy(enemy); }
+        }
     }
 }
 
@@ -252,29 +279,42 @@ fn draw_collision_box(gs: &mut GameState) -> () {
         PLAYER_SIZE.x,
         PLAYER_SIZE.y,
         5.0,
-        GRAY
+        GRAY,
     );
 }
 
-fn draw_healthbar(gs: &mut GameState) {
+fn draw_healthbar(pos: Vec2, offset: Vec2, percentage: f32) {
+    draw_rectangle(
+        pos.x + offset.x,
+        pos.y + offset.y,
+        percentage * HEALTHBAR_SIZE.x,
+        HEALTHBAR_SIZE.y,
+        RED
+    );
+    draw_rectangle_lines(
+        pos.x + offset.x,
+        pos.y + offset.y,
+        percentage * HEALTHBAR_SIZE.x,
+        HEALTHBAR_SIZE.y,
+        5.0,
+        BLACK
+    );
+}
+
+fn draw_healthbar_player(gs: &mut GameState) {
     let health_scaling_factor = gs.player.health / 100.0;
     let offset = vec2(
         PLAYER_SIZE.x / 2.0 - HEALTHBAR_SIZE.x / 2.0,
         PLAYER_SIZE.y + HEALTHBAR_SIZE.y / 2.0
     );
-    draw_rectangle(
-        gs.player.pos.x + offset.x,
-        gs.player.pos.y + offset.y,
-        health_scaling_factor * HEALTHBAR_SIZE.x,
-        HEALTHBAR_SIZE.y,
-        RED
-    );
-    draw_rectangle_lines(
-        gs.player.pos.x + offset.x,
-        gs.player.pos.y + offset.y,
-        health_scaling_factor * HEALTHBAR_SIZE.x,
-        HEALTHBAR_SIZE.y,
-        5.0,
-        BLACK
-    );
+    draw_healthbar(gs.player.pos, offset, health_scaling_factor);
+}
+
+fn draw_healthbar_enemy(enemy: &Enemy) {
+        let health_scaling_factor = enemy.health / 100.0;
+        let offset = vec2(
+            PLAYER_SIZE.x / 2.0 - HEALTHBAR_SIZE.x / 2.0,
+            PLAYER_SIZE.y + HEALTHBAR_SIZE.y / 2.0,
+        );
+        draw_healthbar(enemy.pos, offset, health_scaling_factor);
 }
