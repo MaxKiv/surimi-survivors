@@ -1,40 +1,68 @@
+use std::time::{Duration};
 mod enemy;
-
-use std::time::Duration;
 use macroquad::prelude::*;
-use macroquad_platformer::{Actor, World};
 
-pub const SCREEN_SIZE: Vec2 = vec2(1000., 1000.); 
+pub const SCREEN_SIZE: Vec2 = vec2(1000., 1000.);
 pub const PLAYER_SPEED: f32 = 5.0;
+pub const PLAYER_STARTING_POSITION: Vec2 = vec2(0., 0.);
 pub const PLAYER_SIZE: Vec2 = vec2(32.0, 32.0);
 pub const HEALTHBAR_SIZE: Vec2 = vec2(50.0, 10.0);
 
 struct Resources {
     crab_sprite: Texture2D,
+    shark_sprite: Texture2D,
+    enemy_sprite: Texture2D,
 }
 
 impl Resources {
     async fn new() -> Result<Resources, FileError> {
         let crab_sprite = load_texture("assets/rustacean_happy.png").await?;
+        let shark_sprite = load_texture("assets/sharky-single-boi.png").await?;
+        let enemy_sprite = load_texture("assets/krab-verbeterd.png").await?;
+
 
         Ok(Resources{
-            crab_sprite
+            crab_sprite,
+            shark_sprite,
+            enemy_sprite,
         })
     }
 }
 
-struct CrabPlayer {
-    collider: Actor,
+struct Enemy {
     pos: Vec2,
+    size: Vec2,
+    speed: Vec2,
+    health: f32,
+    damage: f32,
+}
+
+struct Player {
+    pos: Vec2,
+    size: Vec2,
     speed: Vec2,
     health: f32,
 }
 
+struct Wall {
+    pos: Vec2,
+    size: Vec2,
+    solid: bool,
+}
+
+struct Projectile {
+    pos: Vec2,
+    size: Vec2,
+    speed: Vec2,
+}
+
 struct GameState {
     alive: bool,
-    player: CrabPlayer,
+    player: Player,
     max_enemies: i32,
+    walls: Vec<Wall>,
     enemies: Vec<Enemy>,
+    projectiles: Vec<Projectile>,
     playtime: Duration,
 }
 
@@ -50,20 +78,34 @@ fn conf() -> Conf {
 
 #[macroquad::main(conf)]
 async fn main() {
-    let mut world = World::new();
-
-    let mut gs = GameState {
+    let mut gamestate = GameState {
         alive: true,
-        player: CrabPlayer {
-            collider: world.add_actor(vec2(0., 0.), PLAYER_SIZE.x.round() as i32, PLAYER_SIZE.y.round() as i32),
-            pos: vec2(0., 0.),
+        player: Player {
+            pos: PLAYER_STARTING_POSITION,
+            size: PLAYER_SIZE,
             speed: vec2(PLAYER_SPEED, PLAYER_SPEED),
             health: 100.0,
         },
         max_enemies: 100,
-        enemies: Vec::new(),
+        walls: vec![],
+        enemies: vec![],
+        projectiles: vec![],
         playtime: Duration::new(0, 0),
     };
+
+    gamestate.projectiles.push(Projectile{
+        pos: vec2(64.0, 64.0),
+        size: vec2(32.0, 32.0),
+        speed: vec2(1.0, 0.0),
+    });
+
+    gamestate.enemies.push(Enemy{
+        pos: vec2(48.0, 48.0),
+        size: vec2(32.0, 32.0),
+        speed: vec2(1.0, 0.0),
+        health: 100.0,
+        damage: 0.0
+    });
 
     let x = screen_width() / 2.0;
     let y = screen_height() / 2.0;
@@ -72,38 +114,40 @@ async fn main() {
 
     let resources = Resources::new().await.unwrap();
 
-    let enemy = Enemy {
-        collider: world.add_actor(vec2(200.0, 200.0), 200, 200),
-        pos: vec2(200., 200.),
-        speed: vec2(1.,1.),
-        health: 10.,
-        damage: 1.,
-    };
-    // let wall = Wall{
-    //     collider: world.add_solid(vec2(400.0, 130.0), 32, 8),
-    // };
-
-    while gs.alive {
+    while gamestate.alive {
         clear_background(WHITE);
 
         draw_fps();
-        draw_time(&gs);
+        draw_time(&gamestate);
 
-        // draw_projectiles(&gs, &resources);
+        // // Draw "wall"
+        // {
+        //     let pos = world.solid_pos(wall.collider);
+        //     draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
+        // }
+        // draw_projectiles(&gamestate, &resources);
 
-        process_inputs(&mut world, &mut gs);
 
-        // let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
 
-        if world.collide_check(gs.player.collider, gs.player.pos) {
-            gs.player.health -= 1.0;
-        }
+        //let player_pos = world.actor_pos(gamestate.player.collider);
+        process_inputs(&mut gamestate);
+
+        let handle_enemy_hit = |enemy: &Enemy| {
+            println!("Enemy got HITITITITITITITITIT")
+        };
+        collide_check(&gamestate.projectiles.first().unwrap(), &gamestate.enemies, handle_enemy_hit);
+
+        //let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
+
+        // if collided_with_definitely_wall {
+        //     player.health -= 1.0;
+        // }
 
         let camera = Camera2D::from_display_rect(Rect::new(
             // player_pos.x - (width / 2.0),
             // player_pos.y - (height / 2.0),
-            gs.player.pos.x - (width / 2.0),
-            gs.player.pos.y - (height / 2.0),
+            gamestate.player.pos.x - (width / 2.0),
+            gamestate.player.pos.y - (height / 2.0),
             width,
             height)
         );
@@ -111,17 +155,43 @@ async fn main() {
 
         // draw_enemies(&world, &resources);
         // draw single enemy
-        // draw_enemy();
 
-        draw_player(&mut gs, &resources);
+        draw_enemies(&gamestate, &resources);
+        draw_projectiles(&gamestate, &resources);
+        draw_player(&mut gamestate, &resources);
 
-        update_health(&mut gs);
+        update_health(&mut gamestate);
 
         next_frame().await
     }
 
     // scoreboard and close game
 
+}
+
+fn collide_check(projectile: &Projectile, enemies: &Vec<Enemy>, callback: fn(enemy: &Enemy)) {
+    let collide = |pos: Vec2, collider: Vec2, collider_size: Vec2| -> bool{
+            pos.x > collider.x &&
+            pos.x < collider.x + collider_size.x &&
+            pos.y > collider.y &&
+            pos.y < collider.y + collider_size.y
+    };
+
+    for enemy in enemies{
+        let corners: [Vec2; 4] = [
+            vec2(projectile.pos.x, projectile.pos.y),
+            vec2(projectile.pos.x + projectile.size.x, projectile.pos.y),
+            vec2(projectile.pos.x, projectile.pos.y + projectile.size.y),
+            vec2(projectile.pos.x + projectile.size.x, projectile.pos.y + projectile.size.y),
+        ];
+
+        if  collide(corners[0], enemy.pos, enemy.size) ||
+            collide(corners[1], enemy.pos, enemy.size) ||
+            collide(corners[2], enemy.pos, enemy.size) ||
+            collide(corners[3], enemy.pos, enemy.size) {
+            callback(enemy);
+        }
+    }
 }
 
 fn draw_fps() -> () {
@@ -155,25 +225,21 @@ fn update_health(gs: &mut GameState) -> () {
 //     }
 // }
 
-fn process_inputs(world: &mut World, gs: &mut GameState){
+fn process_inputs(gamestate: &mut GameState){
     if is_key_down(KeyCode::D) {
-        gs.player.pos.x += PLAYER_SPEED;
-        world.set_actor_position(gs.player.collider, gs.player.pos);
+        gamestate.player.pos.x += PLAYER_SPEED;
     }
     if is_key_down(KeyCode::A) {
-        gs.player.pos.x -= PLAYER_SPEED;
-        world.set_actor_position(gs.player.collider, gs.player.pos);
+        gamestate.player.pos.x -= PLAYER_SPEED;
     }
     if is_key_down(KeyCode::S) {
-        gs.player.pos.y += PLAYER_SPEED;
-        world.set_actor_position(gs.player.collider, gs.player.pos);
+        gamestate.player.pos.y += PLAYER_SPEED;
     }
     if is_key_down(KeyCode::W) {
-        gs.player.pos.y -= PLAYER_SPEED;
-        world.set_actor_position(gs.player.collider, gs.player.pos);
+        gamestate.player.pos.y -= PLAYER_SPEED;
     }
     if is_key_down(KeyCode::Escape) {
-        gs.alive = false;
+        gamestate.alive = false;
     }
 }
 
@@ -182,6 +248,18 @@ fn draw_player(gs: &mut GameState, resources: &Resources) {
     // draw collision box
     draw_collision_box(gs);
     draw_healthbar(gs);
+}
+
+fn draw_enemies(gs: &GameState, rs: &Resources) {
+    for enemy in gs.enemies.iter() {
+        draw_texture(rs.enemy_sprite, enemy.pos.x, enemy.pos.y, WHITE);
+    }
+}
+
+fn draw_projectiles(gs: &GameState, rs: &Resources) {
+    for projectile in gs.projectiles.iter() {
+        draw_texture(rs.shark_sprite, projectile.pos.x, projectile.pos.y, WHITE);
+    }
 }
 
 fn draw_collision_box(gs: &mut GameState) -> () {

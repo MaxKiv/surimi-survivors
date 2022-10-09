@@ -1,6 +1,6 @@
-use rand::*;
 use macroquad::prelude::{Vec2, vec2};
 use macroquad_platformer::Actor;
+use rand::Rng;
 use crate::{GameState, SCREEN_SIZE};
 
 #[derive(Debug)]
