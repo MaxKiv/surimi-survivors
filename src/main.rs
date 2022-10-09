@@ -1,4 +1,4 @@
-use std::time::{Duration};
+use std::time::{Duration, Instant};
 mod enemy;
 use macroquad::prelude::*;
 
@@ -19,7 +19,6 @@ impl Resources {
         let crab_sprite = load_texture("assets/rustacean_happy.png").await?;
         let shark_sprite = load_texture("assets/sharky-single-boi.png").await?;
         let enemy_sprite = load_texture("assets/krab-verbeterd.png").await?;
-
 
         Ok(Resources{
             crab_sprite,
@@ -57,13 +56,13 @@ struct Projectile {
 }
 
 struct GameState {
+    start_time: Instant,
     alive: bool,
     player: Player,
     max_enemies: i32,
     walls: Vec<Wall>,
     enemies: Vec<Enemy>,
     projectiles: Vec<Projectile>,
-    playtime: Duration,
 }
 
 fn conf() -> Conf {
@@ -78,7 +77,8 @@ fn conf() -> Conf {
 
 #[macroquad::main(conf)]
 async fn main() {
-    let mut gamestate = GameState {
+    let mut gs = GameState {
+        start_time: Instant::now(),
         alive: true,
         player: Player {
             pos: PLAYER_STARTING_POSITION,
@@ -90,16 +90,15 @@ async fn main() {
         walls: vec![],
         enemies: vec![],
         projectiles: vec![],
-        playtime: Duration::new(0, 0),
     };
 
-    gamestate.projectiles.push(Projectile{
+    gs.projectiles.push(Projectile{
         pos: vec2(64.0, 64.0),
         size: vec2(32.0, 32.0),
         speed: vec2(1.0, 0.0),
     });
 
-    gamestate.enemies.push(Enemy{
+    gs.enemies.push(Enemy{
         pos: vec2(48.0, 48.0),
         size: vec2(32.0, 32.0),
         speed: vec2(1.0, 0.0),
@@ -114,53 +113,33 @@ async fn main() {
 
     let resources = Resources::new().await.unwrap();
 
-    while gamestate.alive {
+    while gs.alive {
         clear_background(WHITE);
 
         draw_fps();
-        draw_time(&gamestate);
 
-        // // Draw "wall"
-        // {
-        //     let pos = world.solid_pos(wall.collider);
-        //     draw_texture(resources.crab_sprite, pos.x, pos.y, YELLOW);
-        // }
-        // draw_projectiles(&gamestate, &resources);
+        draw_time(&gs.start_time);
 
-
-
-        //let player_pos = world.actor_pos(gamestate.player.collider);
-        process_inputs(&mut gamestate);
+        process_inputs(&mut gs);
 
         let handle_enemy_hit = |enemy: &Enemy| {
             println!("Enemy got HITITITITITITITITIT")
         };
-        collide_check(&gamestate.projectiles.first().unwrap(), &gamestate.enemies, handle_enemy_hit);
-
-        //let collided_with_definitely_wall =  world.collide_check(player.collider, player_pos);
-
-        // if collided_with_definitely_wall {
-        //     player.health -= 1.0;
-        // }
+        collide_check(&gs.projectiles.first().unwrap(), &gs.enemies, handle_enemy_hit);
 
         let camera = Camera2D::from_display_rect(Rect::new(
-            // player_pos.x - (width / 2.0),
-            // player_pos.y - (height / 2.0),
-            gamestate.player.pos.x - (width / 2.0),
-            gamestate.player.pos.y - (height / 2.0),
+            gs.player.pos.x - (width / 2.0),
+            gs.player.pos.y - (height / 2.0),
             width,
             height)
         );
         set_camera(&camera);
 
-        // draw_enemies(&world, &resources);
-        // draw single enemy
+        draw_enemies(&gs, &resources);
+        draw_projectiles(&gs, &resources);
+        draw_player(&mut gs, &resources);
 
-        draw_enemies(&gamestate, &resources);
-        draw_projectiles(&gamestate, &resources);
-        draw_player(&mut gamestate, &resources);
-
-        update_health(&mut gamestate);
+        update_health(&mut gs);
 
         next_frame().await
     }
@@ -198,10 +177,11 @@ fn draw_fps() -> () {
     draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
 }
 
-fn draw_time(gs: &GameState) -> () {
-    let seconds = gs.playtime.as_secs() % 60;
-    let minutes = (gs.playtime.as_secs() / 60) % 60;
-    let hours = (gs.playtime.as_secs() / 60) / 60;
+fn draw_time(start_time: &Instant) -> () {
+    let playtime = start_time.elapsed();
+    let seconds = playtime.as_secs() % 60;
+    let minutes = (playtime.as_secs() / 60) % 60;
+    let hours = (playtime.as_secs() / 60) / 60;
     let time_string = format!("{}:{}:{}", hours, minutes, seconds);
     draw_text(&time_string, 0., 0., 20.0, DARKGRAY);
 }
@@ -212,34 +192,21 @@ fn update_health(gs: &mut GameState) -> () {
     }
 }
 
-// fn draw_enemies(enemies: &mut [Enemy], resources: &Resources) {
-    // for enemy in &enemies {
-    //     draw_enemy(&enemy, &resources);
-    // }
-// }
-
-//
-// fn draw_projectiles(gs: &GameState, rs: &Resources) {
-//     for p in gs.projectiles {
-//         draw_texture(rs.crab_sprite, gs.player.pos.x, gs.player.pos.y, RED);
-//     }
-// }
-
-fn process_inputs(gamestate: &mut GameState){
+fn process_inputs(gs: &mut GameState){
     if is_key_down(KeyCode::D) {
-        gamestate.player.pos.x += PLAYER_SPEED;
+        gs.player.pos.x += PLAYER_SPEED;
     }
     if is_key_down(KeyCode::A) {
-        gamestate.player.pos.x -= PLAYER_SPEED;
+        gs.player.pos.x -= PLAYER_SPEED;
     }
     if is_key_down(KeyCode::S) {
-        gamestate.player.pos.y += PLAYER_SPEED;
+        gs.player.pos.y += PLAYER_SPEED;
     }
     if is_key_down(KeyCode::W) {
-        gamestate.player.pos.y -= PLAYER_SPEED;
+        gs.player.pos.y -= PLAYER_SPEED;
     }
     if is_key_down(KeyCode::Escape) {
-        gamestate.alive = false;
+        gs.alive = false;
     }
 }
 
@@ -295,8 +262,3 @@ fn draw_healthbar(gs: &mut GameState) {
         BLACK
     );
 }
-
-
-// fn does_projectile_hit(projectile: &Projectile, target: &CrabPlayer){
-//
-// }
