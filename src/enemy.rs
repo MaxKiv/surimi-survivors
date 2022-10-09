@@ -1,7 +1,7 @@
-use macroquad::prelude::{Vec2, vec2};
+use macroquad::prelude::{Vec2, vec2, collections::storage, WHITE};
 use macroquad_platformer::Actor;
 use rand::Rng;
-use crate::{GameState, SCREEN_SIZE};
+use crate::{SCREEN_SIZE, Resources, draw_texture};
 
 #[derive(Debug)]
 enum EnemyType {
@@ -9,32 +9,34 @@ enum EnemyType {
 }
 
 #[derive(Debug)]
-struct Enemy {
+pub struct Enemy {
     r#type: EnemyType,
-    collider: Actor,
     pos: Vec2,
     speed: Vec2,
     health: f32,
     damage: f32,
 }
 
-impl Enemy {
-    fn new(collider: Actor, pos: Vec2, speed: Vec2, health: f32, damage: f32) -> Self { Self { r#type: EnemyType::Shark, collider, pos, speed, health, damage } }
+pub fn spawn_enemy(pos: Vec2, enemy: &Enemy) -> () {
+    let enemy = Enemy {
+        r#type: EnemyType::Shark,
+        pos: spawn_location_factory(&pos),
+        speed: vec2(1.,1.),
+        health: 100.,
+        damage: 1.,
+    };
+    draw_enemy(&enemy);
 }
 
-fn spawn_enemy(gs: &mut GameState, enemy: &Enemy) -> () {
-    draw_enemy(spawn_location_factory(gs), enemy);
+pub fn draw_enemy(enemy: &Enemy) -> () {
+    let rs = storage::get::<Resources>();
+    draw_texture(rs.enemy_sprite, enemy.pos.x, enemy.pos.y, WHITE);
 }
 
-fn draw_enemy(pos: Vec2, enemy: &Enemy) -> () {
-
-}
-
-fn spawn_location_factory(gs: &mut GameState) -> Vec2 {
+pub fn spawn_location_factory(player_pos: &Vec2) -> Vec2 {
     let angle = rand::thread_rng().gen_range(0.0..2.0*std::f64::consts::PI);
     let distance: f32 = 1.5 * (SCREEN_SIZE.x.powi(2) + SCREEN_SIZE.y.powi(2)).sqrt();
-    let x = gs.player.pos.x + (distance * angle.acos()as f32);
-    let y = gs.player.pos.y + (distance * angle.asin()as f32);
+    let x = player_pos.x + (distance * angle.acos()as f32);
+    let y = player_pos.y + (distance * angle.asin()as f32);
     return vec2(x,y);
 }
-

@@ -1,5 +1,6 @@
-use std::time::{Duration, Instant};
 mod enemy;
+
+use std::time::{Duration, Instant};
 use macroquad::prelude::*;
 
 pub const SCREEN_SIZE: Vec2 = vec2(1000., 1000.);
@@ -136,7 +137,9 @@ async fn main() {
             enemy.alive = false;
         };
 
-        //collide_check_player(&gs.player, &mut gs.enemies, handle_enemy_hit);
+        let spawn = enemy::spawn_location_factory(&gs.player.pos);
+        println!("spawning enemy at: {} {}", spawn.x, spawn.y);
+
         for projectile in gs.projectiles.iter() {
             collide_check_projectile(projectile, &mut gs.enemies, handle_enemy_hit);
         }
