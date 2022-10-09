@@ -99,7 +99,7 @@ async fn main() {
     });
 
     gs.enemies.push(Enemy{
-        pos: vec2(48.0, 48.0),
+        pos: vec2(128.0, 128.0),
         size: vec2(32.0, 32.0),
         speed: vec2(1.0, 0.0),
         health: 100.0,
@@ -117,15 +117,17 @@ async fn main() {
         clear_background(WHITE);
 
         draw_fps();
-
         draw_time(&gs.start_time);
 
+        process_inputs(&mut gs);
         process_inputs(&mut gs);
 
         let handle_enemy_hit = |enemy: &Enemy| {
             println!("Enemy got HITITITITITITITITIT")
         };
-        collide_check(&gs.projectiles.first().unwrap(), &gs.enemies, handle_enemy_hit);
+
+        collide_check_player(&gs.player, &gs.enemies, handle_enemy_hit);
+        //collide_check_projectile(&gs.projectiles.first().unwrap(), &gs.enemies, handle_enemy_hit);
 
         let camera = Camera2D::from_display_rect(Rect::new(
             gs.player.pos.x - (width / 2.0),
@@ -143,35 +145,49 @@ async fn main() {
 
         next_frame().await
     }
-
-    // scoreboard and close game
-
 }
 
-fn collide_check(projectile: &Projectile, enemies: &Vec<Enemy>, callback: fn(enemy: &Enemy)) {
+fn collide_check_player(player: &Player, enemies: &Vec<Enemy>, callback: fn(enemy: &Enemy)) {
+    for enemy in enemies{
+        if collide_check(player.pos, player.size, enemy.pos, enemy.size) {
+            callback(enemy)
+        }
+    }
+}
+
+fn collide_check_projectile(projectile: &Projectile, enemies: &Vec<Enemy>, callback: fn(enemy: &Enemy)) {
+    for enemy in enemies{
+        if collide_check(projectile.pos, projectile.size, enemy.pos, enemy.size) {
+            callback(enemy)
+        }
+    }
+}
+
+fn collide_check(pos: Vec2, size: Vec2, other_pos: Vec2, other_size: Vec2) -> bool {
     let collide = |pos: Vec2, collider: Vec2, collider_size: Vec2| -> bool{
-            pos.x > collider.x &&
+        pos.x > collider.x &&
             pos.x < collider.x + collider_size.x &&
             pos.y > collider.y &&
             pos.y < collider.y + collider_size.y
     };
 
-    for enemy in enemies{
-        let corners: [Vec2; 4] = [
-            vec2(projectile.pos.x, projectile.pos.y),
-            vec2(projectile.pos.x + projectile.size.x, projectile.pos.y),
-            vec2(projectile.pos.x, projectile.pos.y + projectile.size.y),
-            vec2(projectile.pos.x + projectile.size.x, projectile.pos.y + projectile.size.y),
-        ];
+    let corners: [Vec2; 4] = [
+        vec2(pos.x, pos.y),
+        vec2(pos.x + size.x, pos.y),
+        vec2(pos.x, pos.y + size.y),
+        vec2(pos.x + size.x, pos.y + size.y),
+    ];
 
-        if  collide(corners[0], enemy.pos, enemy.size) ||
-            collide(corners[1], enemy.pos, enemy.size) ||
-            collide(corners[2], enemy.pos, enemy.size) ||
-            collide(corners[3], enemy.pos, enemy.size) {
-            callback(enemy);
-        }
+    if  collide(corners[0], other_pos, other_size) ||
+        collide(corners[1], other_pos, other_size) ||
+        collide(corners[2], other_pos, other_size) ||
+        collide(corners[3], other_pos, other_size) {
+        return true;
     }
+    return false;
 }
+
+
 
 fn draw_fps() -> () {
     draw_text(&format!("{} FPS", get_fps()).to_string(), 20.0, 20.0, 20.0, DARKGRAY);
